@@ -20,6 +20,7 @@ class Corpus:
         self.corpus = []
         self.tags = []
         self.wtoi = {}
+        self.itow = {}
 
     def load(self, input_file):
         with open(input_file, "r") as f:
@@ -32,6 +33,7 @@ class Corpus:
                     document.append(token)
                     if token not in self.wtoi:
                         self.wtoi[token] = len(self.wtoi)
+                        self.itow[self.wtoi[token]] = token
                     tag = tagtoken[tagtoken.index("_")+1:]
                     tags.append(tag)
                 self.corpus.append(document)
@@ -56,7 +58,7 @@ class LDA:
         # initialization
         self.counter()
         # TODO : while not convergent
-        for k in range(10):
+        for k in range(100):
             for m, document in enumerate(self.C.corpus):
                 for i, token in enumerate(document):
                     # subtraction count of a token and its topic pair
@@ -70,13 +72,14 @@ class LDA:
                     # update topic
                     p /= np.sum(p)
                     z = self.gibbs_sampling(p)
-                    print(z)
                     self.topic[m][i] = z
                     # update counter
                     self.n_zw[self.C.wtoi[token]][z] += 1
                     self.n_dz[m][z] += 1
                     self.n_z[z] += 1
                     self.n_d[m] += 1
+        # examine result
+        self.examine_result()
 
     # intialization
     def counter(self):
@@ -96,6 +99,7 @@ class LDA:
     def assign(self, document_size):
         return np.random.randint(low=0, high=self.num_topic, size=document_size)
 
+    # calculate probability of each topics
     def probability(self, n_zw, n_dz, n_z, n_d):
         # TODO : alpha, beta
         beta = 1
@@ -111,6 +115,16 @@ class LDA:
         z = np.where(cumsum - r > 0)
         return z[0][0]
 
+    def examine_result(self):
+        param = (self.n_zw + 1)/(self.n_z + len(self.C.wtoi))
+        sort = np.argsort(param, axis=0)
+        top_index = [ np.where(sort==i) for i in range(sort.shape[0]-15, sort.shape[0]) ]
+        topic_token = [ [] for _ in range(self.num_topic)]
+        for index in top_index:
+            for topic in range(self.num_topic):
+                token_index = index[0][topic]
+                topic_token[topic].append(self.C.itow[token_index])
+        print(topic_token)
 
 def main():
     args = parse_args()
